@@ -6,7 +6,7 @@ from typing import Callable
 
 @dataclass(frozen=True)
 class Tool:
-    """单个 Tool：OpenAI schema + 可执行函数。"""
+    """name + OpenAI function schema + 实际执行的 Python 可调用对象。"""
 
     name: str
     schema: dict

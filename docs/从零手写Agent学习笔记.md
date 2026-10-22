@@ -24,7 +24,8 @@ tags: [Agent, ReAct, Tool-Calling, Ollama, Python]
 
 | 篇目 | 文件 | 状态 |
 |------|------|------|
-| 第一篇：Tool 原理与常见疑惑 | [`01-理解Agent里的Tool.md`](./01-理解Agent里的Tool.md) | 待你审阅后发表 |
+| 第一篇：Tool | [`01-理解Agent里的Tool.md`](./01-理解Agent里的Tool.md) | 已发 DEV |
+| 第二篇：上下文窗口与多轮 | [`02-上下文窗口与多轮对话.md`](./02-上下文窗口与多轮对话.md) | 草稿 |
 
 ---
 
@@ -36,7 +37,7 @@ tags: [Agent, ReAct, Tool-Calling, Ollama, Python]
 | ② | Tool Calling | `[已完成]` | §3 |
 | ③ | 最小 Agent Loop | `[已完成]` | §4 |
 | ④ | ReAct（思想 + 现代 API 映射） | `[进行中]` | §5 |
-| ⑤ | State / Memory | `[未开始]` | §6 |
+| ⑤ | State / Memory（上下文窗口） | `[进行中]` | §6、第二篇博文 |
 | ⑥ | Web Research Agent | `[未开始]` | §7 |
 | ⑦ | Coding Agent | `[未开始]` | §8 |
 | ⑧ | Planning | `[未开始]` | §9 |
@@ -154,13 +155,15 @@ while step < MAX_STEPS:
 
 ### 4.2 仓库里的实现
 
-核心在 `agent/loop.py` 的 `run_agent()`：
+核心在 `agent/loop.py` 的 `_agent_loop(state, ...)`：
 
-- `messages` 即短期对话状态（尚未抽成独立 State 对象，但已是 State 的雏形）
+- **`AgentState`**（`agent/state.py`）：`messages` + `steps` + `tool_results`
 - `AGENT_MAX_STEPS` 防止死循环
-- `-v` 时用 tag `joyjoy` 打日志，方便对照「每一步 LLM / Tool」
+- system 文案在 `agent/prompt.py`，由 `build_system_prompt()` 注入时间
 
-CLI：`main.py` 支持单次提问、`-i` 交互、`--trace` 打印完整 messages。
+CLI：`main.py` 单次提问；**`-i` 多轮共用同一 state**；`--trace` 打印 messages 与 `state.steps` / `tool_results`。
+
+> 发表稿：[`02-上下文窗口与多轮对话.md`](./02-上下文窗口与多轮对话.md)
 
 ### 4.3 和 LangGraph 的预告关系
 
@@ -201,15 +204,13 @@ Thought → Action → Observation → Thought → … → Final Answer
 
 ---
 
-## 6. State / Memory `[未开始 — 提纲]`
+## 6. State / Memory `[进行中]`
 
-仓库已预留 `agent/state.py`（`messages` / `steps` / `tool_results`）。
+> 第二篇博文草稿：[`02-上下文窗口与多轮对话.md`](./02-上下文窗口与多轮对话.md)
 
-计划写：
-
-- [ ] 把 `loop.py` 里的 `messages` 迁到显式 `AgentState`  
-- [ ] 短期记忆 vs 长期记忆（文件 / 向量库）分工  
-- [ ] 「对话状态」和「任务状态」要不要拆开  
+- [x] `AgentState` + `_agent_loop(state)`；交互模式多轮共用 messages  
+- [ ] 长期记忆（文件 / 向量库）  
+- [ ] 「对话状态」和「任务状态」是否拆分  
 
 ---
 
@@ -331,3 +332,6 @@ python main.py --trace "你的问题"
 | 2026-10-22 | 博文 §7 多 Tool Q&A；`agent/tools/` 包结构 |
 | 2026-10-22 | 博文 Q6 + §8 Agent 调优；`loop.build_system_prompt` 注入时间 |
 | 2026-10-22 | 博文附录 D：本地 `-v` / `--trace` 实测日志 |
+| 2026-10-22 | 第一篇博文重写：学习脉络 + 困惑 + 精简日志，文末仓库链接 |
+| 2026-10-22 | 第二篇博文草稿；AgentState、prompt 模块、交互多轮 |
+| 2026-10-22 | 第二篇改题：上下文窗口与多轮对话（替换 Loop/State 主线） |

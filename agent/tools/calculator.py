@@ -40,6 +40,7 @@ def _eval_ast(node: ast.AST) -> float:
 
 
 def calculator(expression: str) -> str:
+    """Tool 实现：安全求值，返回字符串供 role=tool 的 content 使用。"""
     tree = ast.parse(expression.strip(), mode="eval")
     result = _eval_ast(tree)
     if result == int(result):

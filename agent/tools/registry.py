@@ -10,6 +10,11 @@ logger = logging.getLogger(LOG_TAG)
 
 
 def build_registry(tools: list[Tool]) -> tuple[list[dict], dict[str, Tool]]:
+    """
+    从 Tool 列表生成：
+    - schemas → 传给 LLM 的 TOOL_DEFINITIONS
+    - by_name → 执行时按 name 查找 Python 实现
+    """
     by_name: dict[str, Tool] = {}
     schemas: list[dict] = []
     for t in tools:
@@ -21,6 +26,7 @@ def build_registry(tools: list[Tool]) -> tuple[list[dict], dict[str, Tool]]:
 
 
 def execute_tool(by_name: dict[str, Tool], name: str, arguments: dict[str, Any]) -> str:
+    """模型提议的 function call 在此落地；异常转为 Error 字符串，避免打断 Loop。"""
     tool = by_name.get(name)
     if tool is None:
         logger.warning("unknown tool requested: %s", name)
