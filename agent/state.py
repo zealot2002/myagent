@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agent.prompt import build_system_prompt
+from agent.sources import format_sources_block
 
 
 @dataclass
@@ -19,13 +20,30 @@ class AgentState:
     messages: list[dict] = field(default_factory=list)
     steps: int = 0
     tool_results: list[dict[str, Any]] = field(default_factory=list)
+    sources: list[dict[str, Any]] = field(default_factory=list)
+
+    def sync_system_message(self) -> None:
+        """刷新 system：基础 prompt + 当前 sources 块。"""
+        base = build_system_prompt()
+        block = format_sources_block(self.sources)
+        content = f"{base}\n\n{block}" if block else base
+        if self.messages and self.messages[0].get("role") == "system":
+            self.messages[0]["content"] = content
+        else:
+            self.messages.insert(0, {"role": "system", "content": content})
 
     def refresh_system_prompt(self) -> None:
-        """更新 messages[0] 的 system（例如刷新注入的当前时间）。"""
-        if self.messages and self.messages[0].get("role") == "system":
-            self.messages[0]["content"] = build_system_prompt()
-        else:
-            self.messages.insert(0, {"role": "system", "content": build_system_prompt()})
+        """更新 messages[0] 的 system（时间刷新 + sources 注入）。"""
+        self.sync_system_message()
+
+    def ingest_tool_sources(self, tool_name: str, arguments: dict[str, Any], result: str) -> None:
+        from agent.sources import extract_sources_from_tool, merge_sources
+
+        new_entries = extract_sources_from_tool(tool_name, arguments, result)
+        if not new_entries:
+            return
+        self.sources = merge_sources(self.sources, new_entries, via_tool=tool_name)
+        self.sync_system_message()
 
     def append_user(self, text: str) -> None:
         self.messages.append({"role": "user", "content": text})
@@ -34,11 +52,15 @@ class AgentState:
         self.tool_results.append({"name": name, "result": result})
 
 
+def empty_state() -> AgentState:
+    """仅 system，供网页会话等多轮入口。"""
+    state = AgentState()
+    state.sync_system_message()
+    return state
+
+
 def new_state(user_input: str) -> AgentState:
     """新任务：system + 第一条 user。"""
-    return AgentState(
-        messages=[
-            {"role": "system", "content": build_system_prompt()},
-            {"role": "user", "content": user_input},
-        ]
-    )
+    state = empty_state()
+    state.append_user(user_input)
+    return state

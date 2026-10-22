@@ -7,7 +7,7 @@ import logging
 import re
 import sys
 
-from config import LOG_TAG, OLLAMA_BASE_URL, OLLAMA_MODEL
+from config import LOG_TAG, llm_endpoint_label
 from agent.context import estimate_messages_tokens
 from agent.loop import run_agent, run_agent_state, run_agent_verbose
 from agent.state import AgentState, new_state
@@ -30,16 +30,20 @@ def _print_trace(state: AgentState) -> None:
         print(f"[{i}] {m}")
     approx = estimate_messages_tokens(state.messages)
     print(
-        f"\n--- state: steps={state.steps}, tool_results={state.tool_results}, "
-        f"approx_tokens≈{approx} ---"
+        f"\n--- state: steps={state.steps}, sources={len(state.sources)}, "
+        f"tool_results={state.tool_results}, approx_tokens≈{approx} ---"
     )
+    if state.sources:
+        print("\n--- sources (summary) ---")
+        for s in state.sources[:10]:
+            print(f"  [{s.get('id')}] {s.get('title')} — {s.get('url')}")
 
 
 def main() -> int:
     global _session
 
     parser = argparse.ArgumentParser(
-        description="最小 Agent（Ollama + Tool Calling + Loop；calculator / search_web / fetch_url / save_markdown）"
+        description="最小 Agent（Ollama + Tool Calling；search / HN / RSS / fetch / save）"
     )
     parser.add_argument("question", nargs="?", help="用户问题，例如：123 * 456 + 789 是多少？")
     parser.add_argument("-i", "--interactive", action="store_true", help="交互模式（多轮共享 AgentState）")
@@ -50,7 +54,7 @@ def main() -> int:
 
     _setup_logging(args.verbose)
 
-    print(f"LLM: {OLLAMA_MODEL} @ {OLLAMA_BASE_URL}")
+    print(f"LLM: {llm_endpoint_label()}")
     if not args.interactive:
         print("（单次命令 = 新会话，不含上一轮；多轮追问请用: python main.py -i）\n")
     else:

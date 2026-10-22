@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, Callable
+
+AgentEventFn = Callable[[str, dict[str, Any]], None]
 
 from openai.types.chat import ChatCompletionMessage
 
@@ -27,7 +29,10 @@ def _save_markdown_succeeded(state: AgentState) -> bool:
 
 
 def _research_started(state: AgentState) -> bool:
-    return any(tr.get("name") in ("search_web", "fetch_url") for tr in state.tool_results)
+    return any(
+        tr.get("name") in ("search_web", "search_hn", "fetch_rss", "fetch_url")
+        for tr in state.tool_results
+    )
 
 
 def _user_wants_file_save(messages: list[dict[str, Any]]) -> str | None:
@@ -89,7 +94,20 @@ def _tool_result_turn(tool_call_id: str, name: str, content: str) -> dict[str, A
     }
 
 
-def _agent_loop(state: AgentState, steps_limit: int, *, log_steps: bool) -> str:
+def _preview(text: str, limit: int = 400) -> str:
+    t = (text or "").replace("\n", " ").strip()
+    if len(t) <= limit:
+        return t
+    return t[: limit - 1] + "…"
+
+
+def _agent_loop(
+    state: AgentState,
+    steps_limit: int,
+    *,
+    log_steps: bool,
+    on_event: AgentEventFn | None = None,
+) -> str:
     """
     最小 Agent Loop（与博文一致）::
 
@@ -118,7 +136,13 @@ def _agent_loop(state: AgentState, steps_limit: int, *, log_steps: bool) -> str:
                 steps_limit,
                 state.steps,
             )
+        if on_event:
+            on_event(
+                "step",
+                {"loop": loop_i, "max_loops": steps_limit, "llm_calls": state.steps},
+            )
 
+        state.sync_system_message()
         prepare_messages(messages)
         completion = chat(
             messages,
@@ -130,6 +154,23 @@ def _agent_loop(state: AgentState, steps_limit: int, *, log_steps: bool) -> str:
 
         assistant_turn = _build_assistant_turn(message)
         messages.append(assistant_turn)
+
+        if on_event and message.tool_calls:
+            on_event(
+                "assistant_tools",
+                {
+                    "content": _preview(message.content or "", 200),
+                    "tool_calls": [
+                        {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        }
+                        for tc in message.tool_calls
+                    ],
+                },
+            )
+        elif on_event and (message.content or "").strip():
+            on_event("assistant_text", {"content": _preview(message.content or "", 800)})
 
         if not message.tool_calls:
             content = (message.content or "").strip()
@@ -174,6 +215,15 @@ def _agent_loop(state: AgentState, steps_limit: int, *, log_steps: bool) -> str:
                         }
                     )
                     continue
+            if on_event:
+                on_event(
+                    "done",
+                    {
+                        "answer": content,
+                        "sources": [dict(s) for s in state.sources],
+                        "tool_results": list(state.tool_results),
+                    },
+                )
             return content
 
         for tc in message.tool_calls:
@@ -184,13 +234,35 @@ def _agent_loop(state: AgentState, steps_limit: int, *, log_steps: bool) -> str:
                 args = {}
             if log_steps:
                 logger.info("tool call: %s(%s)", name, args)
+            if on_event:
+                on_event("tool_start", {"name": name, "arguments": args})
             result = execute_tool(name, args)
             state.append_tool_result(name, result)
+            state.ingest_tool_sources(name, args, result)
             if log_steps:
                 logger.info("tool result: %s", result)
+            if on_event:
+                on_event(
+                    "tool_end",
+                    {
+                        "name": name,
+                        "preview": _preview(result, 500),
+                        "sources_count": len(state.sources),
+                    },
+                )
             messages.append(_tool_result_turn(tc.id, name, result))
 
-    return "达到最大步数，未能给出最终答案。请增大 AGENT_MAX_STEPS 或简化问题。"
+    msg = "达到最大步数，未能给出最终答案。请增大 AGENT_MAX_STEPS 或简化问题。"
+    if on_event:
+        on_event(
+            "done",
+            {
+                "answer": msg,
+                "sources": [dict(s) for s in state.sources],
+                "tool_results": list(state.tool_results),
+            },
+        )
+    return msg
 
 
 def run_agent_state(
@@ -198,10 +270,13 @@ def run_agent_state(
     *,
     max_steps: int | None = None,
     log_steps: bool = True,
+    on_event: AgentEventFn | None = None,
 ) -> str:
     """在已有 AgentState 上继续跑 Loop（单问或多轮对话共用）。"""
     steps_limit = max_steps if max_steps is not None else AGENT_MAX_STEPS
-    return _agent_loop(state, steps_limit, log_steps=log_steps)
+    return _agent_loop(
+        state, steps_limit, log_steps=log_steps, on_event=on_event
+    )
 
 
 def run_agent(user_input: str, *, max_steps: int | None = None) -> str:

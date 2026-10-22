@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from agent.tools.calculator import CALCULATOR
+from agent.tools.fetch_rss import FETCH_RSS
 from agent.tools.fetch_url import FETCH_URL
 from agent.tools.save_markdown import SAVE_MARKDOWN
+from agent.tools.search_hn import SEARCH_HN
 from agent.tools.search_web import SEARCH_WEB
 from agent.tools.registry import build_registry, execute_tool as _execute_tool
 
@@ -10,6 +12,8 @@ from agent.tools.registry import build_registry, execute_tool as _execute_tool
 ALL_TOOLS = [
     CALCULATOR,
     SEARCH_WEB,
+    SEARCH_HN,
+    FETCH_RSS,
     FETCH_URL,
     SAVE_MARKDOWN,
 ]

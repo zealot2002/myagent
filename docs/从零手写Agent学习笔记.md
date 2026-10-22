@@ -1,6 +1,6 @@
 ---
 title: 从零手写 Agent：不先上框架，先把 Loop 跑通
-status: draft
+status: ready
 repo: /Users/zzy/study/myAgent
 started: 2026-10-22
 tags: [Agent, ReAct, Tool-Calling, Ollama, Python]
@@ -20,16 +20,12 @@ tags: [Agent, ReAct, Tool-Calling, Ollama, Python]
 
 本仓库是这条路上的实验场：Python + OpenAI 兼容 API + 本地 Ollama，**不依赖 LangChain / LangGraph**。
 
-**已拆分的发表稿：**
+**已拆分的发表稿：** 见 [`00-系列导读.md`](./00-系列导读.md)（七篇 + 导读、`status: ready`、DEV 发表清单）。第一篇曾发 DEV；2–7 按导读表续发，第六篇含网页截图。
 
-| 篇目 | 文件 | 状态 |
-|------|------|------|
-| 第一篇：Tool | [`01-理解Agent里的Tool.md`](./01-理解Agent里的Tool.md) | 已发 DEV |
-| 第二篇：上下文窗口与多轮 | [`02-上下文窗口与多轮对话.md`](./02-上下文窗口与多轮对话.md) | 草稿 |
-| 第三篇：上下文超长治理 | [`03-上下文超长怎么办.md`](./03-上下文超长怎么办.md) | 草稿 |
-| 第四篇：多 Tool 与联网检索 | [`04-多Tool与联网检索.md`](./04-多Tool与联网检索.md) | 草稿 |
-| 第五篇：调研报告与引用 | [`05-调研报告与引用.md`](./05-调研报告与引用.md) | 草稿 |
-| 第六篇：与商用 Agent 差距 | [`06-与商用Agent还差什么.md`](./06-与商用Agent还差什么.md) | 草稿 |
+| 篇 | 文件 |
+|----|------|
+| 导读 | [`00-系列导读.md`](./00-系列导读.md) |
+| 一–七 | [`01`](./01-理解Agent里的Tool.md) … [`07`](./07-与商用Agent还差什么.md) |
 
 ---
 
@@ -223,7 +219,8 @@ Thought → Action → Observation → Thought → … → Final Answer
 
 > 第四篇博文：[`04-多Tool与联网检索.md`](./04-多Tool与联网检索.md)
 
-- [x] `search_web`（无 Key 多源 **串行 failover**；博文 §3.3–3.6 写并发/merge/坑与最佳实践）、`fetch_url`（httpx + 正文抽取）  
+- [x] `search_web`（无 Key 多源 **串行 failover**）、`fetch_url`（httpx + 正文抽取）  
+- [x] `search_hn`（Firebase + Algolia，无 Key）、`fetch_rss`（feedparser）  
 - [x] `ALL_TOOLS` 三件套；`prompt.py` 互斥规则  
 - [x] 第四篇 §7：调研 Agent 定位、与商用差距、第五篇衔接  
 - [ ] 公网部署的 SSRF / 域名策略；search 在受限网络的稳定 fallback  
@@ -236,7 +233,7 @@ Thought → Action → Observation → Thought → … → Final Answer
 > 第五篇博文：[`05-调研报告与引用.md`](./05-调研报告与引用.md)
 
 - [x] `save_markdown`（`reports/` 沙箱）、`prompt` 报告示例  
-- [ ] 从 search/fetch 结果抽取 URL 写入 state  
+- [x] 从 search/fetch/HN/RSS 结果抽取 URL 写入 `AgentState.sources` 并注入 system  
 - [ ] 可选：成稿 URL 白名单校验脚本  
 
 ---

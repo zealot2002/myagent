@@ -3,16 +3,16 @@ from __future__ import annotations
 import httpx
 from openai import OpenAI
 
-from config import OLLAMA_BASE_URL, OLLAMA_MODEL
+from config import LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
 
 
 def create_client() -> OpenAI:
-    """OpenAI SDK 指向 Ollama 的 /v1；api_key 填占位即可。"""
+    """OpenAI SDK 指向任意 OpenAI 兼容 /v1（Ollama、DeepSeek、OpenAI 等）。"""
     # macOS 开系统代理时，httpx 默认 trust_env=True 会把 localhost 走代理 → 502
     http_client = httpx.Client(trust_env=False, timeout=httpx.Timeout(120.0))
     return OpenAI(
-        base_url=OLLAMA_BASE_URL,
-        api_key="ollama",
+        base_url=LLM_BASE_URL,
+        api_key=LLM_API_KEY,
         http_client=http_client,
     )
 
@@ -30,7 +30,7 @@ def chat(
     """
     client = create_client()
     kwargs: dict = {
-        "model": model or OLLAMA_MODEL,
+        "model": model or LLM_MODEL,
         "messages": messages,
     }
     if tools:

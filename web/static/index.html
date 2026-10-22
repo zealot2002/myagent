@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>myAgent · 调研台</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>myAgent 调研台</h1>
+      <p class="sub">同一套 Loop · Tool · sources — CLI 的 trace 可视化</p>
+    </div>
+    <div class="meta">
+      <span id="llm-label">加载中…</span>
+      <button type="button" id="btn-reset" class="ghost">新会话</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="chat panel">
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <form id="form" class="composer">
+        <textarea
+          id="input"
+          rows="3"
+          placeholder="例如：用 search_hn 列 5 条 AI 相关头条并中文概括；或调研某主题并保存到 reports/demo.md"
+        ></textarea>
+        <div class="composer-actions">
+          <label class="check"><input type="checkbox" id="multi" /> 多轮（保留 messages）</label>
+          <button type="submit" id="btn-send">发送</button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="trace panel">
+      <h2>运行轨迹</h2>
+      <div id="timeline" class="timeline"></div>
+      <h2 class="sources-title">来源 <span id="sources-count">0</span></h2>
+      <ul id="sources" class="sources"></ul>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
