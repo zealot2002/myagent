@@ -7,6 +7,7 @@ from typing import Any
 from openai.types.chat import ChatCompletionMessage
 
 from config import AGENT_MAX_STEPS, LOG_TAG
+from agent.context import prepare_messages
 from agent.llm import chat
 from agent.state import AgentState, new_state
 from agent.tools import TOOL_DEFINITIONS, execute_tool
@@ -81,6 +82,7 @@ def _agent_loop(state: AgentState, steps_limit: int, *, log_steps: bool) -> str:
                 state.steps,
             )
 
+        prepare_messages(messages)
         completion = chat(messages, tools=TOOL_DEFINITIONS)
         message = completion.choices[0].message
 

@@ -8,6 +8,7 @@ import re
 import sys
 
 from config import LOG_TAG, OLLAMA_BASE_URL, OLLAMA_MODEL
+from agent.context import estimate_messages_tokens
 from agent.loop import run_agent, run_agent_state, run_agent_verbose
 from agent.state import AgentState, new_state
 
@@ -27,7 +28,11 @@ def _print_trace(state: AgentState) -> None:
     print("\n--- trace (messages) ---")
     for i, m in enumerate(state.messages):
         print(f"[{i}] {m}")
-    print(f"\n--- state: steps={state.steps}, tool_results={state.tool_results} ---")
+    approx = estimate_messages_tokens(state.messages)
+    print(
+        f"\n--- state: steps={state.steps}, tool_results={state.tool_results}, "
+        f"approx_tokens≈{approx} ---"
+    )
 
 
 def main() -> int:

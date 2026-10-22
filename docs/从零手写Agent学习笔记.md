@@ -26,6 +26,7 @@ tags: [Agent, ReAct, Tool-Calling, Ollama, Python]
 |------|------|------|
 | 第一篇：Tool | [`01-理解Agent里的Tool.md`](./01-理解Agent里的Tool.md) | 已发 DEV |
 | 第二篇：上下文窗口与多轮 | [`02-上下文窗口与多轮对话.md`](./02-上下文窗口与多轮对话.md) | 草稿 |
+| 第三篇：上下文超长治理 | [`03-上下文超长怎么办.md`](./03-上下文超长怎么办.md) | 草稿 |
 
 ---
 
@@ -37,7 +38,7 @@ tags: [Agent, ReAct, Tool-Calling, Ollama, Python]
 | ② | Tool Calling | `[已完成]` | §3 |
 | ③ | 最小 Agent Loop | `[已完成]` | §4 |
 | ④ | ReAct（思想 + 现代 API 映射） | `[进行中]` | §5 |
-| ⑤ | State / Memory（上下文窗口） | `[进行中]` | §6、第二篇博文 |
+| ⑤ | State / Memory（上下文窗口 + trim） | `[进行中]` | §6、第二/三篇博文 |
 | ⑥ | Web Research Agent | `[未开始]` | §7 |
 | ⑦ | Coding Agent | `[未开始]` | §8 |
 | ⑧ | Planning | `[未开始]` | §9 |
@@ -209,8 +210,9 @@ Thought → Action → Observation → Thought → … → Final Answer
 > 第二篇博文草稿：[`02-上下文窗口与多轮对话.md`](./02-上下文窗口与多轮对话.md)
 
 - [x] `AgentState` + `_agent_loop(state)`；交互模式多轮共用 messages  
+- [x] `agent/context.py`：`prepare_messages` 截 tool + 滑窗；Loop 每轮 LLM 前调用  
 - [ ] 长期记忆（文件 / 向量库）  
-- [ ] 「对话状态」和「任务状态」是否拆分  
+- [ ] 按 turn 成对删除、摘要压缩  
 
 ---
 
@@ -335,3 +337,4 @@ python main.py --trace "你的问题"
 | 2026-10-22 | 第一篇博文重写：学习脉络 + 困惑 + 精简日志，文末仓库链接 |
 | 2026-10-22 | 第二篇博文草稿；AgentState、prompt 模块、交互多轮 |
 | 2026-10-22 | 第二篇改题：上下文窗口与多轮对话（替换 Loop/State 主线） |
+| 2026-10-22 | 第三篇草稿 + `agent/context.py` + `compare_context_trim.py` |
