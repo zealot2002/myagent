@@ -1,0 +1,333 @@
+---
+title: 从零手写 Agent：不先上框架，先把 Loop 跑通
+status: draft
+repo: /Users/zzy/study/myAgent
+started: 2026-10-22
+tags: [Agent, ReAct, Tool-Calling, Ollama, Python]
+---
+
+> **写作说明（给自己）**  
+> - 本文随 `myAgent` 仓库迭代而扩充，每完成一个 Project 就补全对应章节。  
+> - 已写实的部分标 `[已完成]`；计划中的章节保留提纲，发表前再润色导语与总结。  
+> - 代码以仓库当前版本为准，行号可能变化，引用时优先写文件路径。
+
+---
+
+## 摘要
+
+我想搞懂 Agent **到底在干什么**，而不是只会 `from langgraph import ...`。  
+路线是：**LLM API → Tool Calling → 最小 Loop → ReAct 思想 → State → Planning → 多 Agent → 最后再碰框架**。
+
+本仓库是这条路上的实验场：Python + OpenAI 兼容 API + 本地 Ollama，**不依赖 LangChain / LangGraph**。
+
+**已拆分的发表稿：**
+
+| 篇目 | 文件 | 状态 |
+|------|------|------|
+| 第一篇：Tool 原理与常见疑惑 | [`01-理解Agent里的Tool.md`](./01-理解Agent里的Tool.md) | 待你审阅后发表 |
+
+---
+
+## 学习路线图
+
+| 阶段 | 主题 | 仓库状态 | 博文章节 |
+|------|------|----------|----------|
+| ① | LLM API（OpenAI 兼容 / Ollama） | `[已完成]` | §2 |
+| ② | Tool Calling | `[已完成]` | §3 |
+| ③ | 最小 Agent Loop | `[已完成]` | §4 |
+| ④ | ReAct（思想 + 现代 API 映射） | `[进行中]` | §5 |
+| ⑤ | State / Memory | `[未开始]` | §6 |
+| ⑥ | Web Research Agent | `[未开始]` | §7 |
+| ⑦ | Coding Agent | `[未开始]` | §8 |
+| ⑧ | Planning | `[未开始]` | §9 |
+| ⑨ | Multi-Agent | `[未开始]` | §10 |
+| ⑩ | LangGraph 等框架（对照手写 Loop） | `[未开始]` | §11 |
+
+---
+
+## 1. 普通 Chat 和 Agent 差在哪？
+
+**普通对话**：
+
+```text
+User → LLM → Answer
+```
+
+**Agent**：
+
+```text
+User → LLM → 是否调用 Tool？
+              ├─ 是 → Tool → Observation → LLM → …
+              └─ 否 → Final Answer
+```
+
+一句话抽象：
+
+> **Agent ≈ LLM + Tools + Loop + State**
+
+Agent 不是「特别长的 Prompt」，而是让模型在**可执行环境**里反复 **Action → Observation**，直到可以回答用户。  
+框架只是把这套 Loop 做成可组合、可持久化、可调试的图；**核心仍是 while 循环**。
+
+---
+
+## 2. LLM 后端：本地 Ollama + OpenAI SDK `[已完成]`
+
+### 2.1 为什么用 OpenAI 兼容接口？
+
+习惯用 `openai` 官方 SDK，把 `base_url` 指到 Ollama 的 `/v1` 即可，本地不需要真实 API Key：
+
+- 默认：`http://localhost:11434/v1`
+- 模型：本笔记使用 `qwen2.5:3b`（体积适中，支持 tool calling）
+
+配置见仓库根目录 `config.py`、`.env.example`。
+
+### 2.2 实现要点
+
+`agent/llm.py` 里创建一个 `OpenAI` 客户端，封装 `chat(messages, tools=...)`。
+
+### 2.3 踩坑：系统代理与 localhost
+
+在 macOS 开启 HTTP 代理时，`httpx` 默认 `trust_env=True`，可能把 `localhost:11434` 也走代理，表现为 **502 Bad Gateway**。  
+本仓库对 Ollama 使用 `httpx.Client(trust_env=False)`。若你换环境又连不上，先查这一项。
+
+### 2.4 踩坑：Python 3.9 与类型注解
+
+系统自带 Python 3.9 不支持在运行时解析 `list[dict] | None`，需在模块顶部加：
+
+```python
+from __future__ import annotations
+```
+
+或改用 `typing.Optional` / `typing.List`。
+
+---
+
+## 3. Tool Calling：第一个 Tool 是计算器 `[已完成]`
+
+> **发表版**：Tool 的原理、疑惑、写法已整理为系列第一篇 → [`01-理解Agent里的Tool.md`](./01-理解Agent里的Tool.md)。本节保留仓库向的简要笔记。
+
+### 3.1 为什么从 Calculator 开始？
+
+搜索、读文件、跑命令都依赖「多步 Loop」。  
+**一个 Tool + 一次调用**能把「模型决定调用函数 → 你执行 → 结果塞回对话」这条链路摸清楚。
+
+### 3.2 Tool 的两张「脸」
+
+1. **给模型看的 schema**（名字、描述、参数 JSON Schema）→ `agent/tools/` 汇总为 `TOOL_DEFINITIONS`  
+2. **真正执行的 Python 函数** → 各模块实现 + `registry.execute_tool()`
+
+模型只会根据 schema **提议**调用；**执行权在你手里**，这是 Agent 安全边界的第一课。
+
+### 3.3 不要用裸 `eval`
+
+示例文章里常用 `eval(expression)` 图省事。本仓库用 `ast` 只允许数字与四则运算，避免代码注入。
+
+### 3.4 一次完整交互（概念）
+
+用户：`123 * 456 + 789 是多少？`
+
+1. LLM 返回 `tool_calls: [{ name: calculator, arguments: {...} }]`
+2. `execute_tool` → `"56877"`
+3. 追加 `role: tool` 的 message
+4. LLM 再跑一轮 → 自然语言：`56877`
+
+**到这一步，已经是一个 Agent。**
+
+---
+
+## 4. 最小 Agent Loop：`while` 才是本体 `[已完成]`
+
+### 4.1 伪代码（所有框架的祖先）
+
+```python
+while step < MAX_STEPS:
+    response = llm(messages, tools=tools)
+
+    if response.has_tool_call:
+        for tool_call in response.tool_calls:
+            result = execute_tool(tool_call)
+            messages.append(assistant_turn)
+            messages.append(tool_result(result))
+    else:
+        return response.text
+```
+
+### 4.2 仓库里的实现
+
+核心在 `agent/loop.py` 的 `run_agent()`：
+
+- `messages` 即短期对话状态（尚未抽成独立 State 对象，但已是 State 的雏形）
+- `AGENT_MAX_STEPS` 防止死循环
+- `-v` 时用 tag `joyjoy` 打日志，方便对照「每一步 LLM / Tool」
+
+CLI：`main.py` 支持单次提问、`-i` 交互、`--trace` 打印完整 messages。
+
+### 4.3 和 LangGraph 的预告关系
+
+手写 Loop 等价于这样一张图：
+
+```text
+START → Agent(LLM) → 有 tool? → Tools → Agent → … → END
+```
+
+以后在 LangGraph 里不过是把节点命名、边条件化、状态持久化。**先手写一遍，再看框架不会晕。**
+
+---
+
+## 5. ReAct：Reasoning + Acting `[进行中]`
+
+### 5.1 经典文本格式
+
+```text
+Thought → Action → Observation → Thought → … → Final Answer
+```
+
+例如查天气：先想「需要纽约天气」→ `weather("New York")` → 读 Observation → 再总结。
+
+### 5.2 现代 API 下的 ReAct
+
+很多模型不再强制输出 `<thought>` 标签，而是：
+
+- 在 `content` 里隐式推理，或  
+- 直接发出 **structured tool call**
+
+**学习时：理解 ReAct 是「交替推理与行动」；实现上：Tool call + Tool result + 再 call LLM 就够。**
+
+### 5.3 待补充（学完 Project 2 后写）
+
+- [ ] 用 `--trace` 贴一条真实 messages 轨迹并逐条注释  
+- [ ] 对比：同一问题「纯 Chat」vs「带 calculator」的可靠性差异  
+- [ ] 小模型不调 Tool 时的 fallback 策略（改 prompt / 换模型 / 重试）
+
+---
+
+## 6. State / Memory `[未开始 — 提纲]`
+
+仓库已预留 `agent/state.py`（`messages` / `steps` / `tool_results`）。
+
+计划写：
+
+- [ ] 把 `loop.py` 里的 `messages` 迁到显式 `AgentState`  
+- [ ] 短期记忆 vs 长期记忆（文件 / 向量库）分工  
+- [ ] 「对话状态」和「任务状态」要不要拆开  
+
+---
+
+## 7. Project 2：Web Research Agent `[未开始 — 提纲]`
+
+目标 Tools：`search()`、`fetch_url()`，保留 `calculator()`。
+
+用户问题示例：「查某公司 2026 营收并算同比。」
+
+预期 Agent 行为链：
+
+```text
+search → fetch → calculator → 最终回答
+```
+
+待写内容：
+
+- [ ] 选搜索实现（API / DuckDuckGo 等）与合规说明  
+- [ ] fetch 的长度截断、HTML 提取  
+- [ ] 多步失败时 Loop 如何终止、如何向用户解释  
+
+---
+
+## 8. Project 3：Coding Agent `[未开始 — 提纲]`
+
+Tools 方向：`read_file`、`write_file`、`list_files`、`run_command`。
+
+价值：贴近 Cursor / Claude Code 一类产品的最小内核。
+
+待写：
+
+- [ ] 工作区沙箱（只允许项目目录）  
+- [ ] 「改代码 → 跑测试 → 再改」的 Loop 实例  
+- [ ] 与 Calculator Agent 的架构对比（Loop 不变，只增 Tool）  
+
+---
+
+## 9. Planning `[未开始 — 提纲]`
+
+从逐步 ReAct 到：
+
+```text
+Plan → Execute → Check → Re-plan
+```
+
+待写：
+
+- [ ] 计划是单独一轮 LLM 还是嵌在 Loop 里  
+- [ ] 计划失败 / 步骤跳过怎么处理  
+
+---
+
+## 10. Multi-Agent `[未开始 — 提纲]`
+
+在 **单 Agent Loop 写熟之后** 再写：
+
+```text
+Supervisor → Researcher / Coder / Reviewer
+```
+
+避免过早「Agent 套 Agent」导致看不清 Loop。
+
+---
+
+## 11. 再回头看 LangGraph / CrewAI / AutoGen `[未开始 — 提纲]`
+
+对照 checklist：
+
+- [ ] 手写 Loop 的哪一段被框架替换成「节点」？  
+- [ ] 持久化、人机中断、并行 Tool 框架提供了什么？  
+- [ ] 什么场景仍值得保持零框架依赖  
+
+---
+
+## 附录 A：仓库结构（随开发更新）
+
+```text
+myAgent/
+├── config.py
+├── main.py
+├── agent/
+│   ├── llm.py      # Ollama 客户端
+│   └── tools/      # 每 Tool 一模块 + 注册表
+│   ├── loop.py     # Agent Loop
+│   └── state.py    # 显式状态（待接入 Loop）
+└── docs/
+    └── 从零手写Agent学习笔记.md   # 本文
+```
+
+## 附录 B：本地运行
+
+```bash
+cd myAgent
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+ollama pull qwen2.5:3b   # 若尚未拉取
+
+python main.py -v "123 * 456 + 789 是多少？"
+python main.py -i
+python main.py --trace "你的问题"
+```
+
+## 附录 C：发表前 Checklist
+
+- [ ] 通读全文，删掉过于私人的踩坑（或泛化表述）  
+- [ ] 每章至少一张示意图或一条真实 trace  
+- [ ] 代码片段与仓库同步  
+- [ ] 摘要 + 结论收束「为什么要先手写 Loop」  
+- [ ] 选定发布平台（博客园 / 知乎 / 个人站）并调整排版  
+
+---
+
+## 修订记录
+
+| 日期 | 变更 |
+|------|------|
+| 2026-10-22 | 初稿：路线表 + §1–§4 写实 + §5–§11 提纲；记录 Ollama/代理/Python3.9 踩坑 |
+| 2026-10-22 | 系列第一篇博文：`01-理解Agent里的Tool.md`（Tool 原理与常见疑惑） |
+| 2026-10-22 | 博文 §7 多 Tool Q&A；`agent/tools/` 包结构 |
+| 2026-10-22 | 博文 Q6 + §8 Agent 调优；`loop.build_system_prompt` 注入时间 |
+| 2026-10-22 | 博文附录 D：本地 `-v` / `--trace` 实测日志 |
