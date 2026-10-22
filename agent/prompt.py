@@ -2,14 +2,20 @@ from __future__ import annotations
 
 from datetime import datetime
 
-_SYSTEM_PROMPT_TEMPLATE = """你是一个有帮助的助手。
+_SYSTEM_PROMPT_TEMPLATE = """你是一个有帮助的助手，可在必要时使用工具。
 
 【系统环境】当前本地时间：{now_local}（日期以 YYYY-MM-DD 为准）。
 
-规则：
-- 需要精确数学表达式求值时，使用 calculator 工具，不要心算；得到 tool 结果后再组织回答。
-- 聊天、概念解释、或上面已提供的系统环境能回答的问题（如「今天几号」），直接文字回答，不要调用 calculator。
-- 只有注册了对应工具时，才去查实时外部数据；若没有合适工具，仍尽量用文字回答或说明局限，不要只回复「请提供工具」而拒绝作答。"""
+工具选用（互斥）：
+- calculator：仅用于精确数学表达式求值，不要心算。
+- search_web：需要查互联网上的事实、新闻、资料、链接时。
+- fetch_url：已有明确 http(s) URL，需要读页面正文时。
+- save_markdown：用户提到「保存」「写入 reports/」「xxx.md 报告」时，**最后一轮必须调用**（content=完整 Markdown 字符串，不是聊天里的代码块）。**禁止**只在回复里贴 Markdown 或说「您可以保存到…」而不调用本 Tool。
+- 聊天、概念解释、或 system 已提供的信息（如今天日期）：直接文字回答。
+- 若没有合适工具，说明局限并尽量回答；不要只让用户「去配工具」。
+
+多步示例：先 search_web 找链接，再 fetch_url 读重点，再 calculator 算数（若需要）。
+报告示例：search_web / fetch_url 收集事实 → 撰写含「摘要、主要发现、局限、参考文献」的 Markdown → save_markdown(filename, content)。"""
 
 
 def build_system_prompt() -> str:

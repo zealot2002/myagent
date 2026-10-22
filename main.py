@@ -38,7 +38,9 @@ def _print_trace(state: AgentState) -> None:
 def main() -> int:
     global _session
 
-    parser = argparse.ArgumentParser(description="最小 Calculator Agent（Ollama + Tool Calling + Loop）")
+    parser = argparse.ArgumentParser(
+        description="最小 Agent（Ollama + Tool Calling + Loop；calculator / search_web / fetch_url / save_markdown）"
+    )
     parser.add_argument("question", nargs="?", help="用户问题，例如：123 * 456 + 789 是多少？")
     parser.add_argument("-i", "--interactive", action="store_true", help="交互模式（多轮共享 AgentState）")
     parser.add_argument("-v", "--verbose", action="store_true", help="打印 tool 调用日志")

@@ -17,10 +17,16 @@ def create_client() -> OpenAI:
     )
 
 
-def chat(messages: list[dict], tools: list[dict] | None = None, model: str | None = None):
+def chat(
+    messages: list[dict],
+    tools: list[dict] | None = None,
+    model: str | None = None,
+    *,
+    force_tool_name: str | None = None,
+):
     """
     一次 Chat Completions 请求。
-    tools 非空时附带 tool_choice=auto，模型可返回 tool_calls。
+    tools 非空时默认 tool_choice=auto；force_tool_name 时强制调用指定 function。
     """
     client = create_client()
     kwargs: dict = {
@@ -29,5 +35,11 @@ def chat(messages: list[dict], tools: list[dict] | None = None, model: str | Non
     }
     if tools:
         kwargs["tools"] = tools
-        kwargs["tool_choice"] = "auto"
+        if force_tool_name:
+            kwargs["tool_choice"] = {
+                "type": "function",
+                "function": {"name": force_tool_name},
+            }
+        else:
+            kwargs["tool_choice"] = "auto"
     return client.chat.completions.create(**kwargs)

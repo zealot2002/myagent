@@ -27,6 +27,9 @@ tags: [Agent, ReAct, Tool-Calling, Ollama, Python]
 | 第一篇：Tool | [`01-理解Agent里的Tool.md`](./01-理解Agent里的Tool.md) | 已发 DEV |
 | 第二篇：上下文窗口与多轮 | [`02-上下文窗口与多轮对话.md`](./02-上下文窗口与多轮对话.md) | 草稿 |
 | 第三篇：上下文超长治理 | [`03-上下文超长怎么办.md`](./03-上下文超长怎么办.md) | 草稿 |
+| 第四篇：多 Tool 与联网检索 | [`04-多Tool与联网检索.md`](./04-多Tool与联网检索.md) | 草稿 |
+| 第五篇：调研报告与引用 | [`05-调研报告与引用.md`](./05-调研报告与引用.md) | 草稿 |
+| 第六篇：与商用 Agent 差距 | [`06-与商用Agent还差什么.md`](./06-与商用Agent还差什么.md) | 草稿 |
 
 ---
 
@@ -39,7 +42,7 @@ tags: [Agent, ReAct, Tool-Calling, Ollama, Python]
 | ③ | 最小 Agent Loop | `[已完成]` | §4 |
 | ④ | ReAct（思想 + 现代 API 映射） | `[进行中]` | §5 |
 | ⑤ | State / Memory（上下文窗口 + trim） | `[进行中]` | §6、第二/三篇博文 |
-| ⑥ | Web Research Agent | `[未开始]` | §7 |
+| ⑥ | Web Research Agent | `[进行中]` | §7、第四 / 五篇博文 |
 | ⑦ | Coding Agent | `[未开始]` | §8 |
 | ⑧ | Planning | `[未开始]` | §9 |
 | ⑨ | Multi-Agent | `[未开始]` | §10 |
@@ -79,7 +82,7 @@ Agent 不是「特别长的 Prompt」，而是让模型在**可执行环境**里
 习惯用 `openai` 官方 SDK，把 `base_url` 指到 Ollama 的 `/v1` 即可，本地不需要真实 API Key：
 
 - 默认：`http://localhost:11434/v1`
-- 模型：本笔记使用 `qwen2.5:3b`（体积适中，支持 tool calling）
+- 模型：默认 `qwen2.5:7b`（M4 16GB 可跑；支持 tool calling；博文部分实测仍为 3b 记录）
 
 配置见仓库根目录 `config.py`、`.env.example`。
 
@@ -216,23 +219,25 @@ Thought → Action → Observation → Thought → … → Final Answer
 
 ---
 
-## 7. Project 2：Web Research Agent `[未开始 — 提纲]`
+## 7. Web Research Agent `[进行中]`
 
-目标 Tools：`search()`、`fetch_url()`，保留 `calculator()`。
+> 第四篇博文：[`04-多Tool与联网检索.md`](./04-多Tool与联网检索.md)
 
-用户问题示例：「查某公司 2026 营收并算同比。」
+- [x] `search_web`（无 Key 多源 **串行 failover**；博文 §3.3–3.6 写并发/merge/坑与最佳实践）、`fetch_url`（httpx + 正文抽取）  
+- [x] `ALL_TOOLS` 三件套；`prompt.py` 互斥规则  
+- [x] 第四篇 §7：调研 Agent 定位、与商用差距、第五篇衔接  
+- [ ] 公网部署的 SSRF / 域名策略；search 在受限网络的稳定 fallback  
+- [x] 第五篇：`save_markdown` + §2.1 踩坑实录；sources / 引用校验仍待做（见 [`05-调研报告与引用.md`](./05-调研报告与引用.md)）  
 
-预期 Agent 行为链：
+---
 
-```text
-search → fetch → calculator → 最终回答
-```
+## 7b. 调研报告与落盘 `[进行中 — 第五篇]`
 
-待写内容：
+> 第五篇博文：[`05-调研报告与引用.md`](./05-调研报告与引用.md)
 
-- [ ] 选搜索实现（API / DuckDuckGo 等）与合规说明  
-- [ ] fetch 的长度截断、HTML 提取  
-- [ ] 多步失败时 Loop 如何终止、如何向用户解释  
+- [x] `save_markdown`（`reports/` 沙箱）、`prompt` 报告示例  
+- [ ] 从 search/fetch 结果抽取 URL 写入 state  
+- [ ] 可选：成稿 URL 白名单校验脚本  
 
 ---
 
@@ -308,7 +313,7 @@ myAgent/
 cd myAgent
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-ollama pull qwen2.5:3b   # 若尚未拉取
+ollama pull qwen2.5:7b   # 若尚未拉取
 
 python main.py -v "123 * 456 + 789 是多少？"
 python main.py -i
@@ -338,3 +343,7 @@ python main.py --trace "你的问题"
 | 2026-10-22 | 第二篇博文草稿；AgentState、prompt 模块、交互多轮 |
 | 2026-10-22 | 第二篇改题：上下文窗口与多轮对话（替换 Loop/State 主线） |
 | 2026-10-22 | 第三篇草稿 + `agent/context.py` + `compare_context_trim.py` |
+| 2026-10-22 | 第四篇：多源 search 串行实现 + §3.3–3.6 并发/Adapter/业内实践 |
+| 2026-10-22 | 第四篇 §7 调研 Agent 总结；第五篇草稿（报告 / 引用 / 落盘） |
+| 2026-10-22 | `save_markdown` Tool；第五篇 §2.1 Python 3.13 踩坑实录 |
+| 2026-10-22 | 默认 Ollama `qwen2.5:7b`；第六篇商用差距地图草稿 |

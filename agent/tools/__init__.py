@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 from agent.tools.calculator import CALCULATOR
+from agent.tools.fetch_url import FETCH_URL
+from agent.tools.save_markdown import SAVE_MARKDOWN
+from agent.tools.search_web import SEARCH_WEB
 from agent.tools.registry import build_registry, execute_tool as _execute_tool
 
 # 新增 Tool：import 后 append，Loop 无需修改
 ALL_TOOLS = [
     CALCULATOR,
+    SEARCH_WEB,
+    FETCH_URL,
+    SAVE_MARKDOWN,
 ]
 
 TOOL_DEFINITIONS, _BY_NAME = build_registry(ALL_TOOLS)

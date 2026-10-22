@@ -1,5 +1,7 @@
 .env
 .venv/
+reports/*
+!reports/.gitkeep
 __pycache__/
 *.pyc
 .Python
